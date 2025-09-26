@@ -1,0 +1,109 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    container_name: ecommerce_api
+    ports:
+      - "8081:8080"
+    environment:
+      - DATABASE=postgres:5432/ecommerce
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - KAFKA_BROKER=kafka:9092
+      - PAYMENT_API_URL=https://echo.zuplo.io
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+    networks:
+      - app-network
+    # Add restart policy for better reliability on macOS
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Add shared memory size for better performance on macOS
+    shm_size: 256mb
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6380:6379"
+    networks:
+      - app-network
+    volumes:
+      - redis_data:/data
+    # Add Redis configuration for macOS
+    command: redis-server --appendonly yes --maxmemory 256mb
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      # Add JVM heap settings for macOS
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
+    ports:
+      - "2182:2181"
+    networks:
+      - app-network
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Add JVM heap settings for macOS
+      KAFKA_HEAP_OPTS: "-Xmx1024m -Xms1024m"
+      # Add additional settings for stability
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    ports:
+      - "9093:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - app-network
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
