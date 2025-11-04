@@ -1,6 +1,5 @@
 package com.example.ecommerce.payment.model;
 
-// src/main/java/com/example/payment/model/OrderEvent.java
 import java.io.Serializable;
 import java.util.Objects;
 
